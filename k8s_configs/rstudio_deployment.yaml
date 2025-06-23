@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rstudio
+  namespace: rstudio-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rstudio
+  template:
+    metadata:
+      labels:
+        app: rstudio
+    spec:
+      serviceAccountName: rstudio-sa
+      containers:
+      - name: rstudio
+        image: rocker/rstudio:latest
+        ports:
+        - containerPort: 8787
+        env:
+        - name: PASSWORD
+          value: "rstudio"

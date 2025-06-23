@@ -1,0 +1,119 @@
+import requests
+import time
+import argparse
+import concurrent.futures
+import numpy as np  # Para calcular percentiles
+
+def send_request(url):
+    try:
+        start = time.time()
+        response = requests.get(url)
+        end = time.time()
+        return end - start, response.status_code
+    except Exception as e:
+        return None, None
+
+def main():
+    parser = argparse.ArgumentParser(description="Generador de carga simple")
+    parser.add_argument("--url", type=str, default="http://192.168.1.190:30000/",
+                        help="URL a la que se enviarán las solicitudes")
+    parser.add_argument("--rps", type=int, default=2000, # 200: realmente 38. 1200: realmente 180. 2400: realmente 216. 4800¿160?
+                        help="Número de threads concurrentes")
+    parser.add_argument("--duration", type=int, default=40,
+                        help="Duración de la prueba en segundos")
+    args = parser.parse_args()
+    
+    total_requests = 0
+    successful_requests = 0
+    failures = 0
+    total_time = 0.0
+    latencies = []
+    duration = 0.0
+
+    print(f"Iniciando prueba contra {args.url} durante {args.duration} segundos, enviando {args.rps} solicitudes por segundo...")
+    start_time = time.time()
+    end_time = start_time + args.duration
+
+    try: 
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.rps) as executor:
+            next_request_time = time.time()
+            futures = []  # Lista para almacenar las tareas
+            while time.time() < end_time:
+                current_time = time.time()
+                if current_time >= next_request_time:
+                    for _ in range(args.rps):
+                        if current_time >= end_time:
+                            break
+                        # Enviar la solicitud y registrar el futuro
+                        future = executor.submit(send_request, args.url)
+                        futures.append(future)
+                        print(f"Tiempo restante: {end_time - time.time():.2f}\tsegundos", end="\r")
+
+                    # Calcular el tiempo para la próxima solicitud
+                    next_request_time += 1 / args.rps
+                else:
+                    # Dormir un poco para evitar un bucle ocupado
+                    time.sleep(0.001)
+
+            print(f"Cargando...                                    ", end="\r")
+            # Cancelar tareas pendientes si el tiempo ha expirado
+            for future in futures:
+                if not future.done():
+                    future.cancel()
+            
+            # Procesar los resultados de las solicitudes
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    latency, status_code = future.result()
+                    if latency is not None:
+                        total_requests += 1
+                        latencies.append(latency)
+                        if 200 <= status_code < 300:
+                            successful_requests += 1
+                        else:
+                            failures += 1
+                except Exception as e:
+                    #failures += 1
+                    pass
+
+    except KeyboardInterrupt:
+        print("\nInterrupción detectada. Cancelando tareas pendientes...")
+        for future in futures:
+            if not future.done():
+                future.cancel()
+
+    finally:
+        duration = time.time() - start_time
+
+        #error_rate = (failures / total_requests) * 100 if total_requests > 0 else 0
+        #avg_latency = np.mean(latencies) if latencies else 0
+        #p95_latency = np.percentile(latencies, 95) if latencies else 0
+        #p99_latency = np.percentile(latencies, 99) if latencies else 0
+
+        print("----------------------------------------------------------------------------------------")
+        print(f"Total de solicitudes enviadas: {total_requests}")
+        print(f"Solicitudes exitosas: {successful_requests}")
+        print(f"Fallas: {failures}")
+        #print(f"Tasa de error: {error_rate:.2f}%")
+        print(f"Duración total de la prueba: {duration:.2f} segundos")
+        #if successful_requests > 0:
+        #    print(f"Tiempo de respuesta promedio: {avg_latency:.4f} segundos")
+        #    print(f"P95 de latencia: {p95_latency:.4f} segundos")
+        #    print(f"P99 de latencia: {p99_latency:.4f} segundos")
+
+if __name__ == "__main__":
+    main()
+
+# Use examples:
+# python load_test.py --url http://192.168.1.35:30000/ --rps 20 --duration 60
+# python load_test.py --url http://192.168.1.35:30000/ --rps 100 --duration 60
+# python load_test.py --url http://192.168.1.35:30000/ --rps 1000 --duration 60
+
+
+# freeze requirements on terminal:
+# pip freeze > requirements.txt
+
+
+
+# Para leer el numero de lineas de un fichero /etc/file.log:
+# wc -l /etc/file.log

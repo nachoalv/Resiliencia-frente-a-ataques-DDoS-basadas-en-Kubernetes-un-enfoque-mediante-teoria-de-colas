@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: web-namespace
+data:
+  default.conf: |
+    log_format prometheus '$remote_addr - $remote_user [$time_local] '
+                          '"$request" $status $body_bytes_sent '
+                          '"$http_referer" "$http_user_agent" '
+                          '"$http_x_forwarded_for" $request_time';
+    server {
+      listen 80;
+      access_log /var/log/nginx/access.log prometheus;
+      
+      # Retardo simulado en la ruta raíz
+      location / {
+        echo_sleep 5;  # retardo de 5s
+        add_header X-Dummy-Time "5";
+        echo "dummy_response";
+      }
+
+      # Endpoint de estado para stub_status
+      location /nginx_status {
+        stub_status on;
+        allow 127.0.0.1;     # Solo localhost (sidecar en mismo Pod)
+        deny all;
+      }
+    }

@@ -1,0 +1,83 @@
+# ---- K3s install ---- #
+
+https://docs.k3s.io/installation
+
+https://docs.k3s.io/installation/requirements
+
+sudo ufw disable
+
+sudo apt-get update
+sudo apt-get install curl
+
+curl -sfL https://get.k3s.io | sh -
+
+
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $USER:$USER ~/.kube/config
+
+export KUBECONFIG=~/.kube/config
+
+echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
+source ~/.bashrc
+
+
+# ---- K8s configs ---- #
+
+kubectl apply -f nginx_namespace.yaml
+kubectl apply -f prometheus_namespace.yaml
+
+kubectl apply -f nginx_configmaploaderio.yaml
+kubectl apply -f nginx_configmap.yaml
+kubectl apply -f nginx_configmapsidecar.yaml
+kubectl apply -f nginx_deployment.yaml
+kubectl apply -f nginx_service.yaml
+
+
+watch kubectl get all -n web-namespace
+
+
+kubectl apply -f prometheus_sa.yaml
+kubectl apply -f prometheus_cr.yaml
+kubectl apply -f prometheus_crb.yaml
+
+kubectl apply -f prometheus_configmap.yaml
+kubectl apply -f prometheus_deployment.yaml
+kubectl apply -f prometheus_service.yaml
+
+
+watch kubectl get all -n monitoring
+#para probar: kubectl exec -it -n web-namespace pod/web-deployment-7d8495b8b7-4jp5r -c nginx -- wget -qO- http://127.0.0.1/nginx_status
+
+
+kubectl apply -f rstudio_namespace.yaml
+
+kubectl apply -f rstudio_serviceaccount.yaml
+kubectl apply -f rstudio_clusterrolebinding.yaml
+
+kubectl apply -f rstudio_deployment.yaml
+kubectl apply -f rstudio_service.yaml
+
+
+watch kubectl get all -n rstudio-namespace
+
+http://192.168.1.35:30087
+rstudio:rstudio
+
+http://192.168.1.190:30090
+nginx_connections_accepted
+
+
+# ---- helpers ---- #
+
+#kubectl describe -n web-namespace pod/web-deployment-6c5d7c9659-xv7zc
+#kubectl logs web-deployment-6c5d7c9659-xv7zc -n web-namespace -c nginx --previous
+#kubectl logs -n web-namespace -c prometheus-nginxlog-exporter pod/web-deployment-6c5d7c9659-5k8wg
+#kubectl rollout restart deployment web-deployment -n web-namespace
+
+#kubectl port-forward service/nginx-metrics 9113:9113 -n web-namespace
+#http://127.0.0.1:9113/metrics
+
+#seq 1 100000 | xargs -P40 -n1 curl -s http://localhost:30000/ -o /dev/null
+
+#kubectl logs web-deployment-f44896577-xzbp6 -n web-namespace -c nginx --previous

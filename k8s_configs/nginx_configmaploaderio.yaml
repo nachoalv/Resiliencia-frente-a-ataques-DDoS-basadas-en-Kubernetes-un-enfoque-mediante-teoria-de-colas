@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loaderio-config
+  namespace: web-namespace
+data:
+  loaderio-f10362eea9532a3072056c547d3d7196.txt: |
+    loaderio-f10362eea9532a3072056c547d3d7196

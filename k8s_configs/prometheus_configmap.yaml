@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 8s
+    scrape_configs:
+      # Job para el stub_exporter (9114)
+      - job_name: 'nginx-stub'
+        kubernetes_sd_configs:
+          - role: pod
+
+        relabel_configs:
+          # 1) Filtrar solo Pods en web-namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            action: keep
+            regex: 'web-namespace'
+
+          # 2) KEEP solo Pods anotados para scrapear stub
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+
+          # 3) Construir __address__ = POD_IP:PORT
+          - source_labels:
+              - __meta_kubernetes_pod_ip
+              - __meta_kubernetes_pod_annotation_prometheus_io_port
+            separator: ':'
+            regex: '(.+):(.+)'
+            replacement: '$1:$2'
+            target_label: __address__
+            
+      # Job para el log exporter (9113)
+      - job_name: 'nginx-logs'
+        kubernetes_sd_configs:
+          - role: pod
+
+        relabel_configs:
+          # 1) Filtrar solo Pods en web-namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            action: keep
+            regex: 'web-namespace'
+
+          # 2) KEEP solo Pods anotados para scrapear logs
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape_logs]
+            action: keep
+            regex: "true"
+
+          # 3) Construir __address__ = POD_IP:LOGS_PORT
+          - source_labels:
+              - __meta_kubernetes_pod_ip
+              - __meta_kubernetes_pod_annotation_prometheus_io_logs_port
+            separator: ':'
+            regex: '(.+):(.+)'
+            replacement: '$1:$2'
+            target_label: __address__
